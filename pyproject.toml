@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llmdiff"
+version = "0.1.0"
+description = "Prompt regression testing for RAG pipelines. Like git diff, but for AI."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "LLM Diff Contributors" }]
+keywords = ["llm", "prompt", "testing", "regression", "rag"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "click>=8.1",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "litellm>=1.30,<=1.82.6",  # 1.82.7 and 1.82.8 were backdoored (TeamPCP supply chain attack, 2026-03-24)
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "sse-starlette>=1.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+llmdiff = "llmdiff.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/your-org/llm-diff"
+Repository = "https://github.com/your-org/llm-diff"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["llmdiff*"]
