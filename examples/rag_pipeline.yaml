@@ -1,0 +1,138 @@
+model: groq/llama-3.3-70b-versatile
+judge_model: groq/llama-3.3-70b-versatile
+
+test_cases:
+  - id: tc_001
+    input: "What is LangChain's default chunk size for text splitting?"
+    context: |
+      LangChain's RecursiveCharacterTextSplitter uses a default chunk_size of 1000
+      characters and a chunk_overlap of 200 characters. These defaults are designed
+      to balance retrieval precision with context completeness for most document types.
+    criteria:
+      - "Answer is factually correct (1000 characters)"
+      - "Answer cites the context, not prior knowledge"
+      - "Response is under 100 words"
+    prompt_v1: |
+      You are a helpful technical assistant. Use the provided context to answer the user's question.
+      If the context doesn't contain the answer, say "I don't know based on the provided context."
+
+      Context:
+      {context}
+
+      Question: {input}
+
+      Answer:
+    prompt_v2: |
+      Answer only from the provided context. Be concise and cite specific numbers.
+      If the answer is not in the context, respond with "Not found in context."
+
+      Context: {context}
+
+      Question: {input}
+
+  - id: tc_002
+    input: "How should I handle rate limit errors when calling the OpenAI API in production?"
+    context: |
+      When encountering OpenAI rate limit errors (HTTP 429), the recommended approach is
+      exponential backoff with jitter: start with a 1-second delay, double it on each retry,
+      add random jitter (0–1s), and cap at 60 seconds. Retry up to 5 times before failing.
+      The tenacity library can automate this pattern in Python.
+    criteria:
+      - "Mentions exponential backoff"
+      - "Mentions the tenacity library or an equivalent retry mechanism"
+      - "Does not recommend a fixed sleep/delay as the primary strategy"
+    prompt_v1: |
+      You are an experienced backend engineer. Answer the following question using the
+      provided context. Explain your reasoning and give actionable advice.
+
+      Context:
+      {context}
+
+      Question: {input}
+    prompt_v2: |
+      Using only the context below, give a direct, actionable answer. No preamble.
+
+      Context: {context}
+
+      Question: {input}
+
+  - id: tc_003
+    input: "What embedding model does the context recommend for semantic search over code?"
+    context: |
+      For semantic search over code repositories, text-embedding-3-small from OpenAI
+      provides a strong baseline at low cost. For higher accuracy on code-specific tasks,
+      voyage-code-2 from Voyage AI outperforms general-purpose models on most benchmarks.
+      Both support up to 8192 tokens per input.
+    criteria:
+      - "Names at least one specific embedding model"
+      - "Mentions the token limit (8192)"
+      - "Does not hallucinate models not mentioned in the context"
+    prompt_v1: |
+      You are a helpful AI assistant with expertise in NLP and vector search.
+      Use the context to answer the question thoroughly, including any relevant
+      technical details you know about the topic.
+
+      Context:
+      {context}
+
+      Question: {input}
+    prompt_v2: |
+      Answer strictly from the context. List the models mentioned and their key properties.
+      Do not add information beyond what is stated.
+
+      Context: {context}
+
+      Question: {input}
+
+  - id: tc_004
+    input: "What is the recommended way to store conversation history for a multi-turn chatbot using LangChain?"
+    context: |
+      LangChain provides several memory classes for conversation history. ConversationBufferMemory
+      stores the full message history in memory. For long conversations, ConversationSummaryMemory
+      uses an LLM to summarize older exchanges, keeping token usage bounded. Both integrate with
+      LangChain's chain and agent abstractions via the memory= parameter.
+    criteria:
+      - "Distinguishes between ConversationBufferMemory and ConversationSummaryMemory"
+      - "Mentions the tradeoff: full history vs. token-bounded summary"
+      - "Response is accurate to the context"
+    prompt_v1: |
+      You are a LangChain expert. Provide a comprehensive answer to the question below,
+      drawing from both the context and your general knowledge of LangChain best practices.
+
+      Context:
+      {context}
+
+      Question: {input}
+    prompt_v2: |
+      Based only on the context, explain the options and their tradeoffs concisely.
+
+      Context: {context}
+
+      Question: {input}
+
+  - id: tc_005
+    input: "How do I avoid re-embedding documents that haven't changed in my RAG pipeline?"
+    context: |
+      To avoid redundant embedding computation, store a content hash (e.g., SHA-256) alongside
+      each document chunk in your vector store. Before embedding, compute the hash of the incoming
+      document and check if it already exists. If the hash matches, skip embedding and reuse the
+      stored vector. This pattern is sometimes called content-addressed embedding or incremental indexing.
+    criteria:
+      - "Recommends using a content hash to detect unchanged documents"
+      - "Mentions SHA-256 or an equivalent hashing approach"
+      - "Does not suggest re-embedding all documents on every pipeline run"
+    prompt_v1: |
+      You are an expert in building production RAG systems. Answer the following question
+      with a thorough explanation and code examples if helpful.
+
+      Context:
+      {context}
+
+      Question: {input}
+    prompt_v2: |
+      Answer from the context only. Focus on the specific technique described.
+      Be direct and avoid unnecessary explanation.
+
+      Context: {context}
+
+      Question: {input}
