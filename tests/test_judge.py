@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from llmdiff.judge import judge_pair, judge_test_case, judge_run
+from llmdiff.judge import judge_pair, judge_test_case, judge_run, ABSOLUTE_JUDGE_PROMPT
 
 
 def _mock_resp(text):
@@ -89,6 +89,50 @@ def test_judge_test_case_neutral_verdict(mock_comp):
     runner_result = {"id": "tc_1", "input": "q", "output_v1": "v1", "output_v2": "v2"}
     result = judge_test_case(runner_result, ["c1", "c2", "c3"], "model")
     assert result["overall_verdict"] == "neutral"
+
+
+@patch("llmdiff.judge.litellm.completion")
+def test_absolute_mode_improved(mock_comp):
+    # v1 scores: 0.6, 0.6 → avg 0.6; v2 scores: 0.9, 0.9 → avg 0.9; delta = +0.3 → improved
+    mock_comp.side_effect = _side_effects("0.6", "0.6", "0.9", "0.9")
+    result = judge_pair("q", "out_v1", "out_v2", "criterion", "model", reference_answer="ref ans")
+    assert result["verdict"] == "improved"
+    assert result["delta"] == pytest.approx(0.3, abs=0.01)
+    assert result["score_v1"] == pytest.approx(0.6, abs=0.01)
+    assert result["score_v2"] == pytest.approx(0.9, abs=0.01)
+    assert result["confidence"] == "high"
+
+
+@patch("llmdiff.judge.litellm.completion")
+def test_absolute_mode_regressed(mock_comp):
+    # v1 scores: 0.8, 0.8 → avg 0.8; v2 scores: 0.4, 0.4 → avg 0.4; delta = -0.4 → regressed
+    mock_comp.side_effect = _side_effects("0.8", "0.8", "0.4", "0.4")
+    result = judge_pair("q", "out_v1", "out_v2", "criterion", "model", reference_answer="ref ans")
+    assert result["verdict"] == "regressed"
+    assert result["delta"] == pytest.approx(-0.4, abs=0.01)
+
+
+@patch("llmdiff.judge.litellm.completion")
+def test_absolute_mode_uses_absolute_prompt(mock_comp):
+    # Verify that ABSOLUTE_JUDGE_PROMPT is used (not JUDGE_PROMPT) when reference_answer is set
+    mock_comp.side_effect = _side_effects("0.7", "0.7", "0.7", "0.7")
+    judge_pair("my question", "out_v1", "out_v2", "criterion", "model", reference_answer="the ref")
+    assert mock_comp.call_count == 4
+    first_call_content = mock_comp.call_args_list[0][1]["messages"][0]["content"]
+    assert "my question" in first_call_content
+    assert "the ref" in first_call_content
+    assert "Response A" not in first_call_content  # JUDGE_PROMPT uses "Response A"
+
+
+@patch("llmdiff.judge.litellm.completion")
+def test_ab_mode_unchanged_without_reference(mock_comp):
+    # No reference_answer → original A/B path, JUDGE_PROMPT used
+    mock_comp.side_effect = _side_effects("B\nr", "B\nr", "B\nr")
+    result = judge_pair("q", "out_v1", "out_v2", "criterion", "model", reference_answer=None)
+    assert result["verdict"] == "improved"
+    assert mock_comp.call_count == 3  # 3 votes, not 4 absolute calls
+    first_call_content = mock_comp.call_args_list[0][1]["messages"][0]["content"]
+    assert "Response A" in first_call_content  # JUDGE_PROMPT signature
 
 
 @patch("llmdiff.judge.litellm.completion")
