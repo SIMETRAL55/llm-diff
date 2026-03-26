@@ -1,4 +1,6 @@
 model: groq/llama-3.3-70b-versatile
+# Tip: use a different model family for the judge to reduce self-preference bias
+# e.g. judge_model: anthropic/claude-3-haiku-20240307
 judge_model: groq/llama-3.3-70b-versatile
 
 test_cases:
@@ -8,6 +10,9 @@ test_cases:
       LangChain's RecursiveCharacterTextSplitter uses a default chunk_size of 1000
       characters and a chunk_overlap of 200 characters. These defaults are designed
       to balance retrieval precision with context completeness for most document types.
+    reference_answer: >
+      LangChain's RecursiveCharacterTextSplitter defaults to a chunk_size of 1000 characters
+      and a chunk_overlap of 200 characters.
     criteria:
       - "Answer is factually correct (1000 characters)"
       - "Answer cites the context, not prior knowledge"
@@ -37,6 +42,9 @@ test_cases:
       exponential backoff with jitter: start with a 1-second delay, double it on each retry,
       add random jitter (0–1s), and cap at 60 seconds. Retry up to 5 times before failing.
       The tenacity library can automate this pattern in Python.
+    reference_answer: >
+      Use exponential backoff with jitter: start at 1 second, double each retry, add random jitter,
+      and cap at 60 seconds after up to 5 retries. The tenacity library automates this in Python.
     criteria:
       - "Mentions exponential backoff"
       - "Mentions the tenacity library or an equivalent retry mechanism"
@@ -63,6 +71,9 @@ test_cases:
       provides a strong baseline at low cost. For higher accuracy on code-specific tasks,
       voyage-code-2 from Voyage AI outperforms general-purpose models on most benchmarks.
       Both support up to 8192 tokens per input.
+    reference_answer: >
+      The context recommends text-embedding-3-small as a low-cost baseline and voyage-code-2
+      for higher accuracy on code tasks. Both models support up to 8192 tokens per input.
     criteria:
       - "Names at least one specific embedding model"
       - "Mentions the token limit (8192)"
@@ -136,3 +147,7 @@ test_cases:
       Context: {context}
 
       Question: {input}
+
+threshold:
+  min_pass_rate: 0.6
+  max_regression_count: 2
