@@ -1,4 +1,6 @@
+import json
 import os
+import sys
 
 import yaml
 import click
@@ -9,6 +11,26 @@ from llmdiff.judge import judge_run
 from llmdiff import storage
 
 DB_PATH = os.environ.get("LLMDIFF_DB_PATH", "~/.llmdiff/history.db")
+
+
+def _check_thresholds(summary: dict, threshold_config: dict) -> tuple[bool, str]:
+    """Evaluate threshold config against a run summary. Returns (passed, message)."""
+    total = summary["total"]
+    regressions = summary["regressed"]
+    pass_rate = (summary["improved"] + summary["neutral"]) / total if total > 0 else 1.0
+
+    failures = []
+    min_pass_rate = threshold_config.get("min_pass_rate")
+    max_regression_count = threshold_config.get("max_regression_count")
+
+    if min_pass_rate is not None and pass_rate < min_pass_rate:
+        failures.append(f"pass rate {pass_rate:.0%} < required {min_pass_rate:.0%}")
+    if max_regression_count is not None and regressions > max_regression_count:
+        failures.append(f"{regressions} regressions > allowed {max_regression_count}")
+
+    if failures:
+        return False, f"FAIL: {', '.join(failures)}"
+    return True, "✓ All thresholds passed"
 
 
 @click.group()
@@ -44,6 +66,12 @@ def run(yaml_file):
         f"Done. {s['improved']} improved · {s['regressed']} regressed · {s['neutral']} neutral"
         f"  (run_id: {run_result['run_id']})"
     )
+
+    if "threshold" in config:
+        passed, msg = _check_thresholds(s, config["threshold"])
+        click.echo(msg)
+        if not passed:
+            sys.exit(1)
 
 
 def _render_diff(run_result: dict) -> None:
@@ -111,7 +139,8 @@ def _render_diff(run_result: dict) -> None:
 
 @main.command()
 @click.argument("yaml_file", type=click.Path(exists=True))
-def compare(yaml_file):
+@click.option("--ci", is_flag=True, default=False, help="CI mode: suppress rich output, print one-line result + JSON")
+def compare(yaml_file, ci):
     """Run test cases and print a colored diff to the terminal."""
     with open(yaml_file) as f:
         config = yaml.safe_load(f)
@@ -119,19 +148,38 @@ def compare(yaml_file):
     config["yaml_file"] = yaml_file
     storage.init_db(DB_PATH)
 
-    click.echo(f"Running {len(config['test_cases'])} test cases with {config['model']}...")
-    with click.progressbar(config["test_cases"], label="Running") as bar:
+    if not ci:
+        click.echo(f"Running {len(config['test_cases'])} test cases with {config['model']}...")
+    with click.progressbar(config["test_cases"], label="Running", file=None if not ci else open(os.devnull, "w")) as bar:
         results = []
         for tc in bar:
             result = run_test_cases({"model": config["model"], "test_cases": [tc]})
             results.extend(result)
 
-    click.echo(f"Judging with {config.get('judge_model', config['model'])}...")
+    if not ci:
+        click.echo(f"Judging with {config.get('judge_model', config['model'])}...")
     run_result = judge_run(results, config)
     storage.save_run(run_result, DB_PATH)
 
-    click.echo()
-    _render_diff(run_result)
+    if ci:
+        s = run_result["summary"]
+        threshold_config = config.get("threshold", {})
+        if threshold_config:
+            passed, msg = _check_thresholds(s, threshold_config)
+        else:
+            passed, msg = True, "PASS"
+        print(msg)
+        print(json.dumps(run_result))
+        if not passed:
+            sys.exit(1)
+    else:
+        click.echo()
+        _render_diff(run_result)
+        if "threshold" in config:
+            passed, msg = _check_thresholds(run_result["summary"], config["threshold"])
+            click.echo(msg)
+            if not passed:
+                sys.exit(1)
 
 
 @main.command()
