@@ -15,9 +15,9 @@
 ## Why LLM Diff
 
 - **You changed a prompt. Did it get better?** Find out in 2 minutes.
-- **Works with any LLM** — Groq (free), OpenAI, Anthropic, Ollama, Google Gemini.
+- **Works with any LLM** — OpenAI, Anthropic, Ollama, Google Gemini.
 - **Local-first.** No accounts, no cloud, no data leaves your machine.
-- **One env var.** Set `GROQ_API_KEY` and you're done.
+- **One env var.** Set api key and you're done.
 
 ## Quickstart
 
@@ -58,6 +58,9 @@ test_cases:
   - id: my_test
     input: "What is the default chunk size?"
     context: "LangChain's default chunk_size is 1000 characters..."
+    reference_answer: >
+      LangChain's RecursiveCharacterTextSplitter defaults to a chunk_size of 1000 characters
+      and a chunk_overlap of 200 characters.
     criteria:
       - "Answer is factually correct"
       - "Response is concise (under 50 words)"
@@ -83,30 +86,10 @@ Change 1–2 lines in your YAML — no code changes:
 | OpenAI         | `openai/gpt-4o-mini`                  | `OPENAI_API_KEY`    |
 | Anthropic      | `anthropic/claude-3-haiku-20240307`   | `ANTHROPIC_API_KEY` |
 | Google Gemini  | `gemini/gemini-2.0-flash`             | `GOOGLE_API_KEY`    |
-| Ollama (local) | `ollama/llama3`                       | (none)              |
 
 > **Reduce judge bias:** use a different model family for `judge_model` than `model`.
 > Example: Gemini runner + Groq/Llama judge = cross-family, lowest self-preference bias.
 > See `examples/rag_pipeline_groq_judge.yaml` for a ready-made cross-family config.
-
-## YAML reference
-
-```yaml
-model: groq/llama3-70b-8192        # model for generating outputs
-judge_model: groq/llama3-70b-8192  # model for judging (can be a different provider)
-
-test_cases:
-  - id: tc_001                      # unique identifier
-    input: "user question here"
-    context: "RAG context passage"  # optional
-    criteria:
-      - "Answer is factually correct"
-      - "Response is under 100 words"
-    prompt_v1: |
-      Your baseline prompt. Use {input} and {context} placeholders.
-    prompt_v2: |
-      Your new prompt. Same placeholders.
-```
 
 ## CLI reference
 
@@ -143,6 +126,7 @@ Opens at `http://localhost:7331`. Features:
 | `LLMDIFF_PORT` | `7331` | Web server port |
 | `LLMDIFF_HOST` | `127.0.0.1` | Web server bind address |
 | `LLMDIFF_YAML_DIR` | `~/.llmdiff/tests` | Allowed directory for YAML test files |
+| `LLMDIFF_JUDGE_VOTES` | `3` | calls per criterion: 1=fast, 3=reliable majority vote | 
 
 ## Docker
 
