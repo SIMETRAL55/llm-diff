@@ -6,12 +6,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Powered by Groq](https://img.shields.io/badge/Powered%20by-Groq-orange)](https://console.groq.com)
 
-<!-- screenshot placeholder: dark dashboard -->
-
 ## Why LLM Diff
 
 - **You changed a prompt. Did it get better?** Find out in 2 minutes.
-- **Works with any LLM** — Groq (free), OpenAI, Anthropic, Ollama.
+- **Works with any LLM** — Groq (free), OpenAI, Anthropic, Ollama, Google Gemini.
 - **Local-first.** No accounts, no cloud, no data leaves your machine.
 - **One env var.** Set `GROQ_API_KEY` and you're done.
 
@@ -26,11 +24,15 @@ pip install llmdiff
 # 3. Set the key
 export GROQ_API_KEY=your_key_here
 
-# 4. Write a test YAML (or copy from examples/)
+# 4. Copy an example test file
 cp examples/rag_pipeline.yaml my_tests.yaml
 
 # 5. Compare your prompts
 llmdiff compare my_tests.yaml
+
+# 6. Open the web dashboard
+llmdiff serve
+# → http://localhost:7331
 ```
 
 ## I have a LangChain RAG app — how do I use this?
@@ -41,7 +43,7 @@ If your app looks like:
 result = chain.invoke({"question": q, "context": c})
 ```
 
-Translate it into a YAML test case like this:
+Translate it into a YAML test case:
 
 ```yaml
 model: groq/llama3-70b-8192
@@ -68,19 +70,24 @@ Then run: `llmdiff compare my_tests.yaml`
 
 Change 1–2 lines in your YAML — no code changes:
 
-| Provider   | Model string                          | Env var            |
-|------------|---------------------------------------|--------------------|
-| Groq       | `groq/llama3-70b-8192`                | `GROQ_API_KEY`     |
-| Groq fast  | `groq/llama-3.1-8b-instant`           | `GROQ_API_KEY`     |
-| OpenAI     | `openai/gpt-4o-mini`                  | `OPENAI_API_KEY`   |
-| Anthropic  | `anthropic/claude-3-haiku-20240307`   | `ANTHROPIC_API_KEY`|
-| Ollama     | `ollama/llama3`                       | (none)             |
+| Provider       | Model string                          | Env var             |
+|----------------|---------------------------------------|---------------------|
+| Groq (default) | `groq/llama3-70b-8192`                | `GROQ_API_KEY`      |
+| Groq fast      | `groq/llama-3.1-8b-instant`           | `GROQ_API_KEY`      |
+| OpenAI         | `openai/gpt-4o-mini`                  | `OPENAI_API_KEY`    |
+| Anthropic      | `anthropic/claude-3-haiku-20240307`   | `ANTHROPIC_API_KEY` |
+| Google Gemini  | `gemini/gemini-2.0-flash`             | `GOOGLE_API_KEY`    |
+| Ollama (local) | `ollama/llama3`                       | (none)              |
+
+> **Reduce judge bias:** use a different model family for `judge_model` than `model`.
+> Example: Gemini runner + Groq/Llama judge = cross-family, lowest self-preference bias.
+> See `examples/rag_pipeline_groq_judge.yaml` for a ready-made cross-family config.
 
 ## YAML reference
 
 ```yaml
 model: groq/llama3-70b-8192        # model for generating outputs
-judge_model: groq/llama3-70b-8192  # model for judging (can differ)
+judge_model: groq/llama3-70b-8192  # model for judging (can be a different provider)
 
 test_cases:
   - id: tc_001                      # unique identifier
@@ -97,20 +104,53 @@ test_cases:
 
 ## CLI reference
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `llmdiff compare <yaml>` | Run + print colored diff | `llmdiff compare tests.yaml` |
-| `llmdiff run <yaml>` | Run + store (no terminal output) | `llmdiff run tests.yaml` |
-| `llmdiff history` | List past runs | `llmdiff history` |
-| `llmdiff serve` | Start web UI at localhost:7331 | `llmdiff serve` |
-| `llmdiff demo` | Try it without an API key | `llmdiff demo` |
+| Command | Description |
+|---------|-------------|
+| `llmdiff compare <yaml>` | Run + print colored diff to terminal |
+| `llmdiff run <yaml>` | Run + store results (no terminal output) |
+| `llmdiff history` | List past runs |
+| `llmdiff serve` | Start web dashboard at localhost:7331 |
+| `llmdiff demo` | Try it without an API key |
+
+## Web dashboard
+
+```bash
+llmdiff serve
+```
+
+Opens at `http://localhost:7331`. Features:
+
+- Side-by-side output comparison per test case
+- Live streaming — results appear as they complete
+- Run history with score trend chart
+- Click any past run while a new test is running — views are independent
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GROQ_API_KEY` | — | Groq API key (default provider) |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key |
+| `GOOGLE_API_KEY` | — | Google Gemini API key |
+| `LLMDIFF_DB_PATH` | `~/.llmdiff/history.db` | SQLite database path |
+| `LLMDIFF_PORT` | `7331` | Web server port |
+| `LLMDIFF_HOST` | `127.0.0.1` | Web server bind address |
+| `LLMDIFF_YAML_DIR` | `~/.llmdiff/tests` | Allowed directory for YAML test files |
 
 ## Docker
 
 ```bash
 docker-compose up
 # Dashboard at http://localhost:7331
-# Mount your YAML files into /workspace/tests
+```
+
+Mount your YAML test files into the container:
+
+```yaml
+# docker-compose.yml — add a volume:
+volumes:
+  - ./my_tests:/workspace/tests
 ```
 
 ## Contributing
