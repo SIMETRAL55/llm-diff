@@ -4,7 +4,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/llmdiff)](https://pypi.org/project/llmdiff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Powered by Groq](https://img.shields.io/badge/Powered%20by-Groq-orange)](https://console.groq.com)
+[![Provider Agnostic](https://img.shields.io/badge/Provider-Agnostic%20via%20LiteLLM-6C63FF)](https://docs.litellm.ai)
 
 <br/>
 
