@@ -2,8 +2,11 @@ import logging
 import re
 import time
 from datetime import datetime
+from typing import Callable
 
 import litellm
+
+from backend import config as _cfg
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +74,8 @@ def _call_judge(prompt: str, judge_model: str) -> str:
                 messages=[{"role": "user", "content": prompt}],
             )
             text = response.choices[0].message.content
-            time.sleep(2)  # stay under 30 RPM free tier limit
+            if _cfg.JUDGE_SLEEP > 0:
+                time.sleep(_cfg.JUDGE_SLEEP)
             return text
         except litellm.RateLimitError:
             wait = 2 ** attempt * 5  # 5s, 10s, 20s, 40s
@@ -90,11 +94,13 @@ def judge_pair(
     criterion: str,
     judge_model: str,
     reference_answer: str | None = None,
+    votes: int = 1,
 ) -> dict:
     """Judge a single criterion between two outputs.
 
     When reference_answer is provided, uses absolute scoring mode (0.0–1.0 per output).
-    Otherwise uses A/B comparison mode with 3x majority vote.
+    Otherwise uses A/B comparison mode with majority vote (controlled by `votes`).
+    votes=1 is fastest; votes=3 gives more reliable results via majority vote.
 
     Returns a dict matching the criteria_results shape in CLAUDE.md.
     """
@@ -107,7 +113,7 @@ def judge_pair(
                 output=output,
             )
             scores = []
-            for _ in range(2):
+            for _ in range(max(1, votes - 1)):
                 text = _call_judge(prompt, judge_model)
                 try:
                     scores.append(float(text.strip()))
@@ -136,7 +142,7 @@ def judge_pair(
             "confidence": "high",
         }
 
-    # A/B comparison mode: 3x majority vote
+    # A/B comparison mode: majority vote
     prompt = JUDGE_PROMPT.format(
         input=input,
         criterion=criterion,
@@ -147,7 +153,7 @@ def judge_pair(
     verdicts = []
     reasoning_samples = []
 
-    for _ in range(3):
+    for _ in range(votes):
         text = _call_judge(prompt, judge_model)
         if text:
             verdict, reasoning = _parse_verdict(text)
@@ -204,14 +210,25 @@ def judge_pair(
     }
 
 
-def judge_test_case(runner_result: dict, criteria: list[str], judge_model: str) -> dict:
+def judge_test_case(
+    runner_result: dict,
+    criteria: list[str],
+    judge_model: str,
+    votes: int = 1,
+    criterion_callback: Callable[[int, int, str], None] | None = None,
+) -> dict:
     """Judge all criteria for one test case.
+
+    criterion_callback(index, total, criterion_text) is called before each criterion
+    is judged, so the caller can display live progress.
 
     Returns the full test case result shape with criteria_results and overall_verdict.
     """
     reference_answer = runner_result.get("reference_answer")
     criteria_results = []
-    for criterion in criteria:
+    for i, criterion in enumerate(criteria):
+        if criterion_callback:
+            criterion_callback(i, len(criteria), criterion)
         result = judge_pair(
             input=runner_result["input"],
             output_v1=runner_result["output_v1"],
@@ -219,6 +236,7 @@ def judge_test_case(runner_result: dict, criteria: list[str], judge_model: str) 
             criterion=criterion,
             judge_model=judge_model,
             reference_answer=reference_answer,
+            votes=votes,
         )
         criteria_results.append(result)
 
@@ -244,11 +262,21 @@ def judge_test_case(runner_result: dict, criteria: list[str], judge_model: str) 
     }
 
 
-def judge_run(runner_results: list[dict], config: dict) -> dict:
-    """Judge all test cases in a run and return the full run result shape."""
+def judge_run(
+    runner_results: list[dict],
+    config: dict,
+    test_case_callback: Callable[[dict], None] | None = None,
+    criterion_callback: Callable[[int, int, str], None] | None = None,
+) -> dict:
+    """Judge all test cases in a run and return the full run result shape.
+
+    test_case_callback(judged_case) is called after each test case is fully judged.
+    criterion_callback(index, total, criterion_text) is called before each criterion.
+    """
     run_id = "run_" + datetime.now().strftime("%Y%m%d_%H%M%S")
     timestamp = datetime.now().isoformat()
     judge_model = config.get("judge_model", config.get("model"))
+    votes = int(config.get("judge_votes", _cfg.JUDGE_VOTES))
 
     # Build a lookup: test case id → criteria list
     tc_criteria = {tc["id"]: tc.get("criteria", []) for tc in config.get("test_cases", [])}
@@ -256,8 +284,10 @@ def judge_run(runner_results: list[dict], config: dict) -> dict:
     judged_cases = []
     for result in runner_results:
         criteria = tc_criteria.get(result["id"], [])
-        judged = judge_test_case(result, criteria, judge_model)
+        judged = judge_test_case(result, criteria, judge_model, votes=votes, criterion_callback=criterion_callback)
         judged_cases.append(judged)
+        if test_case_callback:
+            test_case_callback(judged)
 
     # Summary
     verdicts = [tc["overall_verdict"] for tc in judged_cases]

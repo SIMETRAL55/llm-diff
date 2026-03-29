@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>llm diff</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ── Tokens ──────────────────────────────────────────────────── */
+    [data-theme="dark"] {
+      --bg-base:        #0c0c0f;
+      --bg-surface:     #14141a;
+      --bg-elevated:    #1e1e2a;
+      --bg-hover:       #242434;
+      --border:         #2a2a3a;
+      --border-focus:   #4444aa;
+      --border-subtle:  #1e1e28;
+      --accent:         #00ff88;
+      --accent-dim:     rgba(0,255,136,0.10);
+      --accent-glow:    rgba(0,255,136,0.18);
+      --danger:         #ff4455;
+      --danger-dim:     rgba(255,68,85,0.12);
+      --warn:           #ffcc44;
+      --warn-dim:       rgba(255,204,68,0.10);
+      --text-1:         #eeeef5;
+      --text-2:         #7878a0;
+      --text-3:         #3a3a55;
+      --chart-grid:     #1a1a28;
+      --chart-zero:     #333350;
+      --chart-label:    #555575;
+      --shadow:         0 4px 24px rgba(0,0,0,0.5);
+      --shadow-sm:      0 2px 8px rgba(0,0,0,0.4);
+    }
+    [data-theme="light"] {
+      --bg-base:        #f0f2f7;
+      --bg-surface:     #ffffff;
+      --bg-elevated:    #f8f9fc;
+      --bg-hover:       #f0f1f6;
+      --border:         #dde1ed;
+      --border-focus:   #7878d0;
+      --border-subtle:  #e8eaf2;
+      --accent:         #0d9e6e;
+      --accent-dim:     rgba(13,158,110,0.08);
+      --accent-glow:    rgba(13,158,110,0.15);
+      --danger:         #dc2626;
+      --danger-dim:     rgba(220,38,38,0.08);
+      --warn:           #d97706;
+      --warn-dim:       rgba(217,119,6,0.08);
+      --text-1:         #0f1221;
+      --text-2:         #5a6080;
+      --text-3:         #aab0cc;
+      --chart-grid:     #e8eaf2;
+      --chart-zero:     #c8cce0;
+      --chart-label:    #9098b8;
+      --shadow:         0 4px 24px rgba(0,0,0,0.10);
+      --shadow-sm:      0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    html { background: var(--bg-base); color: var(--text-1); font-family: 'IBM Plex Sans', sans-serif; }
+    body { overflow: hidden; }
+    button { font-family: inherit; cursor: pointer; }
+    input, textarea { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-focus); }
+    * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .layout { display: grid; grid-template-columns: 268px 1fr; height: 100vh; }
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sidebar-brand { display: flex; flex-direction: column; gap: 2px; }
+    .sidebar-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px; font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--accent);
+    }
+    .sidebar-tagline { font-size: 11px; color: var(--text-3); }
+
+    .theme-toggle {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .theme-toggle:hover { background: var(--bg-hover); border-color: var(--border-focus); color: var(--text-1); }
+
+    .sidebar-actions { padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); }
+    .new-run-btn {
+      width: 100%; padding: 8px 12px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 12px; font-weight: 600;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+      display: flex; align-items: center; gap: 8px;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .new-run-btn:hover { background: var(--accent-glow); box-shadow: 0 0 12px var(--accent-dim); }
+    .new-run-btn-icon { font-size: 15px; line-height: 1; }
+
+    .filter-chips { padding: 8px 12px 6px; display: flex; gap: 5px; flex-wrap: wrap; }
+    .chip {
+      padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      color: var(--text-2); cursor: pointer; transition: all 0.12s;
+    }
+    .chip:hover { border-color: var(--border-focus); color: var(--text-1); }
+    .chip.chip-active-all    { background: var(--bg-hover); border-color: var(--border-focus); color: var(--text-1); }
+    .chip.chip-active-improved { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+    .chip.chip-active-regressed { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+    .chip.chip-active-neutral { background: var(--bg-hover); border-color: var(--text-3); color: var(--text-2); }
+
+    .run-list { flex: 1; overflow-y: auto; }
+    .run-list-empty { padding: 24px 16px; font-size: 12px; color: var(--text-3); text-align: center; font-family: 'JetBrains Mono', monospace; }
+
+    .live-item {
+      padding: 10px 14px;
+      background: var(--accent-dim);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s ease-in-out infinite; flex-shrink: 0; }
+    @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+    .live-item-text { font-size: 11px; color: var(--accent); font-weight: 500; flex: 1; }
+    .live-item-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--accent); opacity: 0.7; }
+    .live-item-active { background: rgba(0, 255, 136, 0.12); border-left: 2px solid var(--accent); }
+
+    .run-item {
+      padding: 10px 14px; cursor: pointer;
+      border-left: 2px solid transparent;
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .run-item:hover { background: var(--bg-hover); }
+    .run-item.active { border-left-color: var(--accent); background: var(--accent-dim); }
+    .run-item-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .run-item-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .run-item.active .run-item-id { color: var(--accent); }
+    .run-item-ts { font-size: 10px; color: var(--text-3); flex-shrink: 0; }
+    .run-item-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; }
+    .run-badges { display: flex; gap: 4px; }
+    .badge {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .badge-green { background: var(--accent-dim); color: var(--accent); }
+    .badge-red   { background: var(--danger-dim); color: var(--danger); }
+    .badge-gray  { background: var(--bg-elevated); color: var(--text-3); }
+    .run-delta { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+    .delta-pos { color: var(--accent); } .delta-neg { color: var(--danger); } .delta-zero { color: var(--text-3); }
+
+    /* ── Main area ───────────────────────────────────────────────── */
+    .main { display: flex; flex-direction: column; overflow: hidden; background: var(--bg-base); }
+
+    .main-header {
+      height: 48px; padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-surface);
+      display: flex; align-items: center; gap: 12px;
+      flex-shrink: 0;
+    }
+    .main-header-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-1); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .main-header-meta { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 8px; }
+    .header-btn {
+      padding: 4px 11px; border-radius: 5px; font-size: 11px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--bg-elevated);
+      color: var(--text-2); display: flex; align-items: center; gap: 5px;
+      transition: all 0.12s;
+    }
+    .header-btn:hover { border-color: var(--border-focus); color: var(--text-1); background: var(--bg-hover); }
+    .header-btn-stop  { border-color: var(--danger); color: var(--danger); background: var(--danger-dim); }
+    .header-btn-stop:hover { background: rgba(255,68,85,0.2); }
+    .header-btn-reset { border-color: var(--warn); color: var(--warn); background: var(--warn-dim); }
+    .header-btn-reset:hover { background: rgba(255,204,68,0.18); }
+    .header-divider { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+
+    .main-content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .main-chart { height: 185px; padding: 14px 24px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg-surface); }
+
+    /* ── Empty state ─────────────────────────────────────────────── */
+    .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 40px; }
+    .empty-icon { font-size: 36px; opacity: 0.3; }
+    .empty-title { font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--text-2); }
+    .empty-sub { font-size: 12px; color: var(--text-3); text-align: center; line-height: 1.6; }
+    .empty-cmd { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--accent); padding: 6px 14px; border-radius: 5px; margin-top: 4px; }
+    .empty-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+
+    /* ── Tabs ────────────────────────────────────────────────────── */
+    .tabs-bar {
+      display: flex; overflow-x: auto; flex-shrink: 0;
+      background: var(--bg-surface); border-bottom: 1px solid var(--border);
+      padding: 0 8px;
+      gap: 2px;
+    }
+    .tabs-bar::-webkit-scrollbar { height: 3px; }
+    .tab {
+      padding: 10px 13px; font-size: 11px; color: var(--text-2);
+      cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
+      display: flex; align-items: center; gap: 5px;
+      transition: color 0.12s;
+      border-radius: 4px 4px 0 0;
+    }
+    .tab:hover { color: var(--text-1); background: var(--bg-hover); }
+    .tab.active { color: var(--text-1); border-bottom-color: var(--accent); }
+    .tab-icon { font-size: 12px; }
+
+    /* ── Test case browser ───────────────────────────────────────── */
+    .tc-view { flex: 1; overflow-y: auto; padding: 18px 22px; }
+    .tc-outputs { display: grid; grid-template-columns: 1fr 44px 1fr; gap: 10px; align-items: start; margin-bottom: 18px; }
+    .output-col { display: flex; flex-direction: column; gap: 5px; }
+    .output-col-header { display: flex; align-items: center; justify-content: space-between; }
+    .output-label { font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; }
+    .copy-btn {
+      padding: 2px 7px; border-radius: 4px; font-size: 10px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      color: var(--text-3); transition: all 0.12s;
+    }
+    .copy-btn:hover { color: var(--text-2); border-color: var(--border-focus); }
+    .copy-btn.copied { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+    .output-box {
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: 6px; padding: 12px 13px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.65;
+      max-height: 210px; overflow-y: auto; color: var(--text-1);
+      white-space: pre-wrap; word-break: break-word;
+      transition: border-color 0.15s;
+    }
+    .output-box.improved { border-color: rgba(0,255,136,0.25); background: rgba(0,255,136,0.04); }
+    .output-box.regressed { border-color: rgba(255,68,85,0.25); background: rgba(255,68,85,0.04); }
+
+    .verdict-center { display: flex; align-items: center; justify-content: center; padding-top: 20px; }
+    .verdict-pill {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+    }
+    .verdict-pill.improved { background: var(--accent-dim); border: 1px solid var(--accent); }
+    .verdict-pill.regressed { background: var(--danger-dim); border: 1px solid var(--danger); }
+    .verdict-pill.neutral { background: var(--bg-elevated); border: 1px solid var(--border); }
+
+    /* ── Criteria table ──────────────────────────────────────────── */
+    .criteria-section { margin-top: 4px; }
+    .criteria-section-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+    .criteria-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .criteria-table th {
+      text-align: left; padding: 7px 10px;
+      color: var(--text-3); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border); background: var(--bg-surface);
+      position: sticky; top: 0; z-index: 2;
+    }
+    .criteria-row { cursor: pointer; transition: background 0.1s; }
+    .criteria-row:hover td { background: var(--bg-hover); }
+    .criteria-row td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+    .criteria-row:last-child td { border-bottom: none; }
+    .criteria-row.expanded td { background: var(--bg-elevated); }
+    .cr-label { display: flex; align-items: center; gap: 6px; }
+    .expand-icon { font-size: 9px; color: var(--text-3); transition: transform 0.18s; flex-shrink: 0; }
+    .criteria-row.expanded .expand-icon { transform: rotate(90deg); }
+    .cr-text { font-size: 12px; color: var(--text-1); }
+    .cr-reasoning-row td { padding: 0 10px 10px; background: var(--bg-elevated); }
+    .cr-reasoning-inner { font-size: 11px; color: var(--text-2); line-height: 1.6; padding: 8px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 5px; font-family: 'IBM Plex Sans', sans-serif; font-style: italic; }
+    .cr-confidence { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--bg-elevated); color: var(--text-3); }
+    .cr-improved { color: var(--accent); } .cr-regressed { color: var(--danger); } .cr-neutral { color: var(--text-2); }
+    .score-pill { font-family: 'JetBrains Mono', monospace; font-size: 11px; display: inline-block; min-width: 32px; text-align: center; }
+
+    /* ── Live run view ───────────────────────────────────────────── */
+    .live-view { flex: 1; overflow-y: auto; padding: 18px 22px; }
+    .live-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .live-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-2); }
+    .live-counter { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3); }
+    .live-progress-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
+    .live-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+    .live-cards { display: flex; flex-direction: column; gap: 10px; }
+
+    .live-card {
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px; overflow: hidden;
+      animation: slideIn 0.25s cubic-bezier(0.2,0.8,0.3,1);
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .live-card.improved { border-left: 3px solid var(--accent); }
+    .live-card.regressed { border-left: 3px solid var(--danger); }
+    .live-card.neutral { border-left: 3px solid var(--border-focus); }
+    .live-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .live-card-id { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-1); font-weight: 500; }
+    .live-card-verdict { font-size: 11px; font-weight: 500; margin-left: auto; }
+    .live-card-verdict.improved { color: var(--accent); }
+    .live-card-verdict.regressed { color: var(--danger); }
+    .live-card-verdict.neutral { color: var(--text-2); }
+    .live-outputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .live-output {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: 5px; padding: 8px; max-height: 72px; overflow: hidden;
+      color: var(--text-2); white-space: pre-wrap; line-height: 1.5;
+      position: relative;
+    }
+    .live-output::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 20px; background: linear-gradient(transparent, var(--bg-elevated)); }
+    .live-output-label { font-size: 9px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .criteria-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .criteria-chip { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-family: 'JetBrains Mono', monospace; }
+    .criteria-chip.improved { background: var(--accent-dim); color: var(--accent); }
+    .criteria-chip.regressed { background: var(--danger-dim); color: var(--danger); }
+    .criteria-chip.neutral { background: var(--bg-elevated); color: var(--text-3); }
+
+    /* Skeleton shimmer */
+    .skeleton-card { background: var(--bg-surface); border: 1px dashed var(--border); border-radius: 8px; padding: 14px; }
+    .skeleton-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .skeleton-box { background: var(--bg-elevated); border-radius: 4px; overflow: hidden; position: relative; }
+    .skeleton-box::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 0%, var(--bg-hover) 50%, transparent 100%);
+      animation: shimmer 1.6s infinite;
+    }
+    @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+    .skeleton-title { height: 12px; width: 120px; }
+    .skeleton-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .skeleton-outputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .skeleton-output { height: 58px; }
+    .skeleton-chips { display: flex; gap: 4px; margin-top: 8px; }
+    .skeleton-chip { height: 18px; border-radius: 10px; }
+    .skeleton-status { font-size: 11px; color: var(--text-3); margin-left: auto; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 6px; }
+    .spinner { width: 10px; height: 10px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Modal ───────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal {
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 24px; width: 460px;
+      box-shadow: var(--shadow); animation: modalIn 0.18s cubic-bezier(0.2,0.8,0.3,1);
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .modal-title { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text-1); }
+    .modal-close { width: 26px; height: 26px; border-radius: 5px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-2); font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.12s; }
+    .modal-close:hover { color: var(--text-1); border-color: var(--border-focus); }
+    .form-group { margin-bottom: 14px; }
+    .form-label { font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 6px; }
+    .form-input {
+      width: 100%; background: var(--bg-elevated); border: 1px solid var(--border);
+      color: var(--text-1); font-size: 12px; padding: 9px 12px;
+      border-radius: 6px; outline: none; transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(68,68,170,0.12); }
+    .form-hint { font-size: 11px; color: var(--text-3); margin-top: 5px; display: flex; align-items: center; gap: 4px; }
+    .kbd { display: inline-block; padding: 1px 5px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-2); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px; border-top: 1px solid var(--border-subtle); margin-top: 6px; }
+    .btn {
+      padding: 7px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border); display: flex; align-items: center; gap: 6px;
+      transition: all 0.12s;
+    }
+    .btn-primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-ghost { background: transparent; color: var(--text-2); }
+    .btn-ghost:hover { background: var(--bg-hover); color: var(--text-1); }
+
+    /* ── Chart ───────────────────────────────────────────────────── */
+    .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .chart-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+    .chart-meta { font-size: 11px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Misc ────────────────────────────────────────────────────── */
+    .visually-hidden { position: absolute; width: 1px; height: 1px; clip: rect(0,0,0,0); overflow: hidden; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ── Helpers ──────────────────────────────────────────────────────── */
+function relativeTime(ts) {
+  const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function verdictIcon(v) {
+  if (v === 'improved') return '↑';
+  if (v === 'regressed') return '↓';
+  return '→';
+}
+
+function deltaFmt(d) {
+  return (d >= 0 ? '+' : '') + d.toFixed(2);
+}
+
+/* ── useTheme ─────────────────────────────────────────────────────── */
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('llmdiff_theme') || 'dark');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('llmdiff_theme', theme);
+  }, [theme]);
+  const toggle = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
+  return [theme, toggle];
+}
+
+/* ── useCopy ──────────────────────────────────────────────────────── */
+function useCopy() {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback((text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }, []);
+  return [copied, copy];
+}
+
+/* ── TrendChart ───────────────────────────────────────────────────── */
+function TrendChart({ runs, theme }) {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const sorted = [...runs].reverse();
+    const labels = sorted.map(r => {
+      const d = new Date(r.timestamp);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const data = sorted.map(r => r.summary?.score_delta_avg ?? 0);
+
+    const isDark = theme === 'dark';
+    const gridColor   = isDark ? '#1a1a28' : '#e8eaf2';
+    const zeroColor   = isDark ? '#333350' : '#c8cce0';
+    const labelColor  = isDark ? '#555575' : '#9098b8';
+    const lineColor   = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(60,60,100,0.5)';
+    const ttBg        = isDark ? '#1e1e2a' : '#ffffff';
+    const ttBorder    = isDark ? '#2a2a3a' : '#dde1ed';
+    const ttTitle     = isDark ? '#7878a0' : '#5a6080';
+    const ttBody      = isDark ? '#eeeef5' : '#0f1221';
+    const ptImproved  = isDark ? '#00ff88' : '#0d9e6e';
+    const ptRegressed = isDark ? '#ff4455' : '#dc2626';
+    const ptNeutral   = isDark ? '#444466' : '#aab0cc';
+
+    if (chartRef.current) chartRef.current.destroy();
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          borderColor: lineColor,
+          borderWidth: 1.5,
+          pointBackgroundColor: data.map(v => v > 0.05 ? ptImproved : v < -0.05 ? ptRegressed : ptNeutral),
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          tension: 0.35,
+          fill: { target: { value: 0 }, above: ptImproved + '1a', below: ptRegressed + '1a' },
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: ttBg, borderColor: ttBorder, borderWidth: 1,
+            titleColor: ttTitle, bodyColor: ttBody, padding: 10,
+            titleFont: { family: 'JetBrains Mono', size: 10 },
+            bodyFont: { family: 'JetBrains Mono', size: 11 },
+            callbacks: {
+              title: items => sorted[items[0].dataIndex]?.run_id ?? '',
+              label: item => {
+                const s = sorted[item.dataIndex]?.summary;
+                if (!s) return '';
+                return [`Δ ${deltaFmt(item.raw)}`, `↑${s.improved}  ↓${s.regressed}  →${s.neutral}`];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: labelColor, font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: gridColor } },
+          y: {
+            min: -1, max: 1,
+            ticks: { color: labelColor, font: { family: 'JetBrains Mono', size: 10 } },
+            grid: { color: ctx => ctx.tick.value === 0 ? zeroColor : gridColor }
+          }
+        }
+      }
+    });
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+  }, [runs, theme]);
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div className="chart-header">
+        <span className="chart-title">Score delta over runs</span>
+        {runs.length > 0 && (
+          <span className="chart-meta">{runs.length} run{runs.length !== 1 ? 's' : ''}</span>
+        )}
+      </div>
+      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+        <canvas ref={canvasRef} />
+      </div>
+    </div>
+  );
+}
+
+/* ── CriteriaRow ──────────────────────────────────────────────────── */
+function CriteriaRow({ cr }) {
+  const [expanded, setExpanded] = useState(false);
+  const cls = cr.verdict === 'improved' ? 'cr-improved' : cr.verdict === 'regressed' ? 'cr-regressed' : 'cr-neutral';
+  return (
+    <>
+      <tr className={`criteria-row ${expanded ? 'expanded' : ''}`} onClick={() => setExpanded(v => !v)}>
+        <td>
+          <div className="cr-label">
+            <span className="expand-icon">▶</span>
+            <span className="cr-text">{cr.criterion}</span>
+          </div>
+        </td>
+        <td><span className={`score-pill ${cls}`}>{cr.score_v1.toFixed(1)}</span></td>
+        <td><span className={`score-pill ${cls}`}>{cr.score_v2.toFixed(1)}</span></td>
+        <td><span className={`score-pill ${cls}`}>{deltaFmt(cr.delta)}</span></td>
+        <td>
+          <span className={cls} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {verdictIcon(cr.verdict)}&nbsp;{cr.verdict}
+          </span>
+        </td>
+        <td><span className="cr-confidence">{cr.confidence}</span></td>
+      </tr>
+      {expanded && cr.reasoning && (
+        <tr className="cr-reasoning-row">
+          <td colSpan={6}>
+            <div className="cr-reasoning-inner">"{cr.reasoning}"</div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/* ── OutputBox ────────────────────────────────────────────────────── */
+function OutputBox({ text, verdict, label }) {
+  const [copied, copy] = useCopy();
+  return (
+    <div className="output-col">
+      <div className="output-col-header">
+        <span className="output-label">{label}</span>
+        <button className={`copy-btn ${copied ? 'copied' : ''}`} onClick={() => copy(text)}>
+          {copied ? '✓ copied' : 'copy'}
+        </button>
+      </div>
+      <div className={`output-box ${verdict}`}>{text}</div>
+    </div>
+  );
+}
+
+/* ── TestCaseBrowser ──────────────────────────────────────────────── */
+function TestCaseBrowser({ run, filter }) {
+  const [activeTab, setActiveTab] = useState(0);
+  if (!run?.test_cases?.length) return null;
+
+  const cases = run.test_cases.filter(tc => {
+    if (filter === 'all') return true;
+    return tc.overall_verdict === filter;
+  });
+
+  if (!cases.length) return (
+    <div className="empty">
+      <div className="empty-icon">🔍</div>
+      <div className="empty-title">No matching test cases</div>
+      <div className="empty-sub">No {filter} results in this run</div>
+    </div>
+  );
+
+  const safeTab = Math.min(activeTab, cases.length - 1);
+  const tc = cases[safeTab];
+
+  return (
+    <>
+      <div className="tabs-bar">
+        {cases.map((t, i) => (
+          <div key={t.id} className={`tab ${i === safeTab ? 'active' : ''}`} onClick={() => setActiveTab(i)}>
+            <span className={`tab-icon cr-${t.overall_verdict}`}>{verdictIcon(t.overall_verdict)}</span>
+            {t.id}
+          </div>
+        ))}
+      </div>
+      <div className="tc-view">
+        <div className="tc-outputs">
+          <OutputBox text={tc.output_v1 ?? ''} verdict={tc.overall_verdict === 'regressed' ? 'improved' : ''} label="Prompt V1" />
+          <div className="verdict-center">
+            <div className={`verdict-pill ${tc.overall_verdict}`}>{verdictIcon(tc.overall_verdict)}</div>
+          </div>
+          <OutputBox text={tc.output_v2 ?? ''} verdict={tc.overall_verdict === 'improved' ? 'improved' : tc.overall_verdict === 'regressed' ? 'regressed' : ''} label="Prompt V2" />
+        </div>
+        {tc.criteria_results?.length > 0 && (
+          <div className="criteria-section">
+            <div className="criteria-section-title">Criteria Breakdown — click a row to see reasoning</div>
+            <table className="criteria-table">
+              <thead>
+                <tr>
+                  <th>Criterion</th>
+                  <th style={{width:48}}>V1</th>
+                  <th style={{width:48}}>V2</th>
+                  <th style={{width:56}}>Delta</th>
+                  <th style={{width:100}}>Verdict</th>
+                  <th style={{width:72}}>Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tc.criteria_results.map((cr, i) => <CriteriaRow key={i} cr={cr} />)}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ── SkeletonCard ─────────────────────────────────────────────────── */
+function SkeletonCard({ processingLabel }) {
+  return (
+    <div className="skeleton-card">
+      <div className="skeleton-header">
+        <div className="skeleton-box skeleton-dot" />
+        <div className="skeleton-box skeleton-title" />
+        <div className="skeleton-status">
+          <span className="spinner" />
+          {processingLabel}
+        </div>
+      </div>
+      <div className="skeleton-outputs">
+        <div className="skeleton-box skeleton-output" />
+        <div className="skeleton-box skeleton-output" />
+      </div>
+      <div className="skeleton-chips">
+        {[60,90,75].map((w,i) => (
+          <div key={i} className="skeleton-box skeleton-chip" style={{width: w}} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── LiveRunView ──────────────────────────────────────────────────── */
+function LiveRunView({ liveCards, liveTotal, liveRunning, livePhase }) {
+  const pct = liveTotal > 0 ? Math.min((liveCards.length / liveTotal) * 100, 100) : (liveRunning ? 5 : 100);
+  return (
+    <div className="live-view">
+      <div className="live-header">
+        <span className="live-title">
+          {liveRunning
+            ? liveTotal > 0
+              ? `${liveCards.length} / ${liveTotal} test cases`
+              : 'starting…'
+            : `Complete — ${liveCards.length} / ${liveTotal} test cases`
+          }
+        </span>
+        {liveRunning && livePhase && <span className="live-counter">{livePhase}</span>}
+      </div>
+      <div className="live-progress-track">
+        <div className="live-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="live-cards">
+        {liveCards.slice().reverse().map(tc => (
+          <div key={tc.id} className={`live-card ${tc.overall_verdict}`}>
+            <div className="live-card-header">
+              <span style={{ fontSize: 14 }}>{tc.overall_verdict === 'improved' ? '↑' : tc.overall_verdict === 'regressed' ? '↓' : '→'}</span>
+              <span className="live-card-id">{tc.id}</span>
+              <span className={`live-card-verdict ${tc.overall_verdict}`}>{tc.overall_verdict}</span>
+              {tc.criteria_results && (
+                <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'JetBrains Mono', marginLeft: 8 }}>
+                  Δ{deltaFmt(tc.criteria_results.reduce((s, c) => s + (c.delta ?? 0), 0) / (tc.criteria_results.length || 1))}
+                </span>
+              )}
+            </div>
+            <div className="live-outputs">
+              <div className="live-output">
+                <div className="live-output-label">V1</div>
+                {tc.output_v1?.slice(0, 220)}
+              </div>
+              <div className="live-output">
+                <div className="live-output-label">V2</div>
+                {tc.output_v2?.slice(0, 220)}
+              </div>
+            </div>
+            {tc.criteria_results?.length > 0 && (
+              <div className="criteria-chips">
+                {tc.criteria_results.map((cr, i) => (
+                  <span key={i} className={`criteria-chip ${cr.verdict}`} title={cr.criterion}>
+                    {cr.criterion.length > 22 ? cr.criterion.slice(0, 22) + '…' : cr.criterion}
+                    &nbsp;{deltaFmt(cr.delta)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+        {liveRunning && <SkeletonCard processingLabel={livePhase || 'judging…'} />}
+      </div>
+    </div>
+  );
+}
+
+/* ── NewRunModal ──────────────────────────────────────────────────── */
+function NewRunModal({ onClose, onStart, lastYaml }) {
+  const [path, setPath] = useState(lastYaml || 'examples/rag_pipeline.yaml');
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">New Run</div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="form-group">
+          <label className="form-label">YAML file path</label>
+          <input
+            ref={inputRef}
+            className="form-input"
+            value={path}
+            onChange={e => setPath(e.target.value)}
+            placeholder="examples/rag_pipeline.yaml"
+            onKeyDown={e => { if (e.key === 'Enter') onStart(path); }}
+          />
+          <div className="form-hint">
+            Press <span className="kbd">↵ Enter</span> to run · <span className="kbd">Esc</span> to cancel
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => onStart(path)}>
+            ▶ Run
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── App ──────────────────────────────────────────────────────────── */
+function App() {
+  const [theme, toggleTheme] = useTheme();
+  const [runs, setRuns] = useState([]);
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  const [selectedRun, setSelectedRun] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  // viewMode: 'live' = watching the active stream, 'history' = viewing a past run, 'empty' = nothing selected
+  const [viewMode, setViewMode] = useState('empty');
+  const [liveRunning, setLiveRunning] = useState(false);
+  const [liveCards, setLiveCards] = useState([]);
+  const [liveTotal, setLiveTotal] = useState(0);
+  const [livePhase, setLivePhase] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [lastYaml, setLastYaml] = useState(() => localStorage.getItem('llmdiff_last_yaml') || '');
+
+  const [loadingRun, setLoadingRun] = useState(false);
+
+  const readerRef = useRef(null);
+  const liveRunIdRef = useRef(null);
+  const runCacheRef = useRef({});   // cache full run data by run_id
+  const userPickedRef = useRef(false);  // true when user manually clicked a past run
+
+  /* Fetch run list */
+  const fetchRuns = useCallback(async () => {
+    try {
+      const res = await fetch('/api/runs');
+      setRuns(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchRuns(); }, [fetchRuns]);
+
+  /* Prefetch full data for every run in the list (fills cache so clicks are instant) */
+  useEffect(() => {
+    if (runs.length === 0) return;
+    runs.forEach(r => {
+      if (runCacheRef.current[r.run_id]) return;   // already cached
+      fetch(`/api/runs/${r.run_id}`)
+        .then(res => res.json())
+        .then(data => { runCacheRef.current[r.run_id] = data; })
+        .catch(() => {});
+    });
+  }, [runs]);
+
+  /* Select a specific run — serve from cache instantly, then refresh in background */
+  const selectRun = useCallback(async (runId) => {
+    setSelectedRunId(runId);
+    const cached = runCacheRef.current[runId];
+    if (cached) {
+      setSelectedRun(cached);
+      setLoadingRun(false);
+      return;   // already have it — no network needed
+    }
+    setLoadingRun(true);
+    try {
+      const res = await fetch(`/api/runs/${runId}`);
+      const data = await res.json();
+      runCacheRef.current[runId] = data;
+      setSelectedRun(data);
+    } catch {}
+    setLoadingRun(false);
+  }, []);
+
+  /* Auto-select first run on load — only when not watching a live run */
+  useEffect(() => {
+    if (!selectedRunId && runs.length > 0 && viewMode !== 'live') {
+      selectRun(runs[0].run_id);
+      setViewMode('history');
+    }
+  }, [runs, selectedRunId, viewMode, selectRun]);
+
+  /* Keyboard shortcut: n → open modal */
+  useEffect(() => {
+    const handler = e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'n') { e.preventDefault(); setShowModal(true); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  /* Stop the live run */
+  const stopRun = useCallback(() => {
+    try { readerRef.current?.cancel?.(); } catch {}
+    readerRef.current = null;
+    setLiveRunning(false);
+    setLivePhase('stopped');
+    // stay on live view so user sees the partial results
+  }, []);
+
+  /* Reset (restart the last yaml) */
+  const resetRun = useCallback(() => {
+    if (lastYaml) startRun(lastYaml);
+  }, [lastYaml]);
+
+  /* Start a new run via SSE */
+  const startRun = useCallback((yamlFile) => {
+    setShowModal(false);
+    setViewMode('live');
+    setLiveRunning(true);
+    setLiveCards([]);
+    setLiveTotal(0);
+    setLivePhase('initialising…');
+    liveRunIdRef.current = null;
+    userPickedRef.current = false;
+
+    setLastYaml(yamlFile);
+    localStorage.setItem('llmdiff_last_yaml', yamlFile);
+
+    try { readerRef.current?.cancel?.(); } catch {}
+
+    fetch('/api/runs/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ yaml_file: yamlFile }),
+    }).then(res => {
+      const reader = res.body.getReader();
+      readerRef.current = reader;
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      function pump() {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            setLiveRunning(false);
+            setLivePhase('');
+            return;
+          }
+          buf += decoder.decode(value, { stream: true });
+          const parts = buf.split('\n\n');
+          buf = parts.pop();
+          for (const part of parts) {
+            const evMatch   = part.match(/event:\s*(\S+)/);
+            const dataMatch = part.match(/data:\s*(.+)/s);
+            if (!evMatch || !dataMatch) continue;
+            const ev   = evMatch[1];
+            let data;
+            try { data = JSON.parse(dataMatch[1]); } catch { continue; }
+
+            if (ev === 'start') {
+              setLiveTotal(data.total ?? 0);
+              liveRunIdRef.current = data.run_id ?? null;
+              setLivePhase('running test cases…');
+            } else if (ev === 'result') {
+              setLiveCards(prev => [...prev, data]);
+              setLivePhase(`judged ${data.id}`);
+            } else if (ev === 'done') {
+              setLiveRunning(false);
+              setLivePhase('done!');
+              readerRef.current = null;
+              fetchRuns().then(() => {
+                if (!userPickedRef.current) {
+                  const rid = liveRunIdRef.current;
+                  setViewMode('history');
+                  if (rid) selectRun(rid);
+                }
+              });
+            }
+          }
+          pump();
+        }).catch(() => {
+          setLiveRunning(false);
+          setLivePhase('');
+        });
+      }
+      pump();
+    }).catch(() => {
+      setLiveRunning(false);
+      setLivePhase('error');
+    });
+  }, [fetchRuns, selectRun]);
+
+  /* Header content when a run is selected */
+  const hasRun = !!selectedRun;
+  const runSummary = selectedRun?.summary;
+
+  return (
+    <div className="layout">
+
+      {/* ── Sidebar ──────────────────────────────────────────── */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <div className="sidebar-logo">llm diff</div>
+            <div className="sidebar-tagline">prompt regression testing</div>
+          </div>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? '☀' : '◑'}
+          </button>
+        </div>
+
+        <div className="sidebar-actions">
+          <button className="new-run-btn" onClick={() => setShowModal(true)}>
+            <span className="new-run-btn-icon">+</span>
+            New Run
+            <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10, fontFamily: 'JetBrains Mono' }}>N</span>
+          </button>
+        </div>
+
+        <div className="filter-chips">
+          {['all', 'improved', 'regressed', 'neutral'].map(f => (
+            <button
+              key={f}
+              className={`chip ${filter === f ? `chip-active-${f}` : ''}`}
+              onClick={() => setFilter(f)}
+            >
+              {f === 'all' ? 'All' : f === 'improved' ? '↑ Improved' : f === 'regressed' ? '↓ Regressed' : '→ Neutral'}
+            </button>
+          ))}
+        </div>
+
+        <div className="run-list">
+          {liveRunning && (
+            <div
+              className={`live-item ${viewMode === 'live' ? 'live-item-active' : ''}`}
+              onClick={() => setViewMode('live')}
+              style={{ cursor: 'pointer' }}
+            >
+              <span className="pulse" />
+              <span className="live-item-text">Live run in progress</span>
+              {liveTotal > 0
+                ? <span className="live-item-count">{liveCards.length}/{liveTotal}</span>
+                : <span className="live-item-count">starting…</span>
+              }
+            </div>
+          )}
+          {runs.length === 0 && !isLive && (
+            <div className="run-list-empty">no runs yet</div>
+          )}
+          {runs.map(r => {
+            const d = r.summary?.score_delta_avg ?? 0;
+            const deltaClass = d > 0.05 ? 'delta-pos' : d < -0.05 ? 'delta-neg' : 'delta-zero';
+            return (
+              <div
+                key={r.run_id}
+                className={`run-item ${r.run_id === selectedRunId ? 'active' : ''}`}
+                onClick={() => { userPickedRef.current = true; setViewMode('history'); selectRun(r.run_id); }}
+              >
+                <div className="run-item-top">
+                  <span className="run-item-id">{r.run_id}</span>
+                  <span className="run-item-ts">{relativeTime(r.timestamp)}</span>
+                </div>
+                <div className="run-item-meta">
+                  <div className="run-badges">
+                    <span className="badge badge-green">↑{r.summary?.improved ?? 0}</span>
+                    <span className="badge badge-red">↓{r.summary?.regressed ?? 0}</span>
+                    <span className="badge badge-gray">→{r.summary?.neutral ?? 0}</span>
+                  </div>
+                  <span className={`run-delta ${deltaClass}`} style={{ fontFamily: 'JetBrains Mono', fontSize: 11 }}>
+                    {deltaFmt(d)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+
+      {/* ── Main ─────────────────────────────────────────────── */}
+      <main className="main">
+
+        {/* Header bar */}
+        <div className="main-header">
+          {viewMode === 'live' ? (
+            <>
+              <div className="pulse" style={{ flexShrink: 0 }} />
+              <span className="main-header-title">
+                {liveRunning
+                  ? (liveTotal > 0 ? `${liveCards.length} / ${liveTotal} — ${livePhase}` : 'initialising…')
+                  : `Done — ${liveCards.length} test cases`
+                }
+              </span>
+              {liveRunning && (
+                <button className="header-btn header-btn-stop" onClick={stopRun}>
+                  ■ Stop
+                </button>
+              )}
+              <div className="header-divider" />
+              <button className="header-btn header-btn-reset" onClick={resetRun} disabled={!lastYaml}>
+                ↺ Reset
+              </button>
+            </>
+          ) : hasRun ? (
+            <>
+              <span className="main-header-title">{selectedRun.run_id}</span>
+              <div className="main-header-meta">
+                {runSummary && (
+                  <>
+                    <span style={{ color: 'var(--accent)' }}>↑{runSummary.improved}</span>
+                    <span style={{ color: 'var(--danger)' }}>↓{runSummary.regressed}</span>
+                    <span style={{ color: 'var(--text-3)' }}>→{runSummary.neutral}</span>
+                  </>
+                )}
+              </div>
+              <div className="header-divider" />
+              <button className="header-btn header-btn-reset" onClick={resetRun} disabled={!lastYaml} title="Re-run last YAML">
+                ↺ Rerun
+              </button>
+            </>
+          ) : (
+            <span className="main-header-title" style={{ color: 'var(--text-3)' }}>llm diff</span>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="main-content">
+          {viewMode === 'live' ? (
+            <LiveRunView
+              liveCards={liveCards}
+              liveTotal={liveTotal}
+              liveRunning={liveRunning}
+              livePhase={livePhase}
+            />
+          ) : hasRun ? (
+            <TestCaseBrowser run={selectedRun} filter={filter} />
+          ) : loadingRun ? (
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[1,2,3].map(i => <SkeletonCard key={i} processingLabel="loading…" />)}
+            </div>
+          ) : (
+            <div className="empty">
+              <div className="empty-icon">⊞</div>
+              <div className="empty-title">No runs yet</div>
+              <div className="empty-sub">
+                Run a YAML test file to see prompt comparisons here.
+              </div>
+              <div className="empty-cmd">llmdiff compare examples/rag_pipeline.yaml</div>
+              <div className="empty-hint">or press <span className="kbd">N</span> to start a run from the browser</div>
+            </div>
+          )}
+        </div>
+
+        {/* Trend chart */}
+        <div className="main-chart">
+          <TrendChart runs={runs} theme={theme} />
+        </div>
+      </main>
+
+      {/* Modal */}
+      {showModal && (
+        <NewRunModal
+          onClose={() => setShowModal(false)}
+          onStart={startRun}
+          lastYaml={lastYaml}
+        />
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>

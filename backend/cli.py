@@ -4,13 +4,17 @@ import sys
 
 import yaml
 import click
+from dotenv import load_dotenv
 
-from llmdiff import version
-from llmdiff.runner import run_test_cases
-from llmdiff.judge import judge_run
-from llmdiff import storage
+load_dotenv()
 
-DB_PATH = os.environ.get("LLMDIFF_DB_PATH", "~/.llmdiff/history.db")
+from backend import version
+from backend.runner import run_test_cases
+from backend.judge import judge_run
+from backend import storage
+from backend import config as _cfg
+
+DB_PATH = _cfg.DB_PATH
 
 
 def _check_thresholds(summary: dict, threshold_config: dict) -> tuple[bool, str]:
@@ -74,58 +78,63 @@ def run(yaml_file):
             sys.exit(1)
 
 
+def _render_test_case(tc: dict) -> None:
+    """Render a single test case verdict with per-criterion breakdown."""
+    verdict = tc["overall_verdict"]
+    criteria_results = tc.get("criteria_results", [])
+
+    if criteria_results:
+        avg_delta = sum(r["delta"] for r in criteria_results) / len(criteria_results)
+    else:
+        avg_delta = 0.0
+
+    improved_count = sum(1 for r in criteria_results if r["verdict"] == "improved")
+    regressed_count = sum(1 for r in criteria_results if r["verdict"] == "regressed")
+    total_criteria = len(criteria_results)
+
+    if verdict == "improved":
+        icon = click.style("✅", fg="green")
+        tc_id = click.style(tc["id"], fg="green")
+        summary = click.style(
+            f"{improved_count}/{total_criteria} criteria improved (+{avg_delta:.2f} avg delta)",
+            fg="green",
+        )
+    elif verdict == "regressed":
+        icon = click.style("❌", fg="red")
+        tc_id = click.style(tc["id"], fg="red")
+        worst = min(criteria_results, key=lambda r: r["delta"])
+        summary = click.style(
+            f"{regressed_count} criterion regressed ({worst['criterion'][:30]} {avg_delta:+.2f})",
+            fg="red",
+        )
+    else:
+        icon = click.style("➡ ", fg="white", dim=True)
+        tc_id = click.style(tc["id"], dim=True)
+        summary = click.style("no significant change", dim=True)
+
+    click.echo(f"{icon} {tc_id} — {summary}")
+
+    for cr in criteria_results:
+        delta = cr["delta"]
+        crit_name = cr["criterion"]
+        if cr["verdict"] == "improved":
+            mark = click.style("  ✓", fg="green")
+            detail = click.style(f"{crit_name} ({delta:+.1f})", fg="green")
+        elif cr["verdict"] == "regressed":
+            mark = click.style("  ✗", fg="red")
+            detail = click.style(f"{crit_name} ({delta:+.1f})", fg="red")
+        else:
+            mark = click.style("  →", dim=True)
+            detail = click.style(f"{crit_name} ({delta:+.1f})", dim=True)
+        click.echo(f"{mark} {detail}")
+
+    click.echo()
+
+
 def _render_diff(run_result: dict) -> None:
     """Render a colored terminal diff from a full run result."""
     for tc in run_result["test_cases"]:
-        verdict = tc["overall_verdict"]
-        criteria_results = tc.get("criteria_results", [])
-
-        if criteria_results:
-            avg_delta = sum(r["delta"] for r in criteria_results) / len(criteria_results)
-        else:
-            avg_delta = 0.0
-
-        improved_count = sum(1 for r in criteria_results if r["verdict"] == "improved")
-        regressed_count = sum(1 for r in criteria_results if r["verdict"] == "regressed")
-        total_criteria = len(criteria_results)
-
-        if verdict == "improved":
-            icon = click.style("✅", fg="green")
-            tc_id = click.style(tc["id"], fg="green")
-            summary = click.style(
-                f"{improved_count}/{total_criteria} criteria improved (+{avg_delta:.2f} avg delta)",
-                fg="green",
-            )
-        elif verdict == "regressed":
-            icon = click.style("❌", fg="red")
-            tc_id = click.style(tc["id"], fg="red")
-            worst = min(criteria_results, key=lambda r: r["delta"])
-            summary = click.style(
-                f"{regressed_count} criterion regressed ({worst['criterion'][:30]} {avg_delta:+.2f})",
-                fg="red",
-            )
-        else:
-            icon = click.style("➡ ", fg="white", dim=True)
-            tc_id = click.style(tc["id"], dim=True)
-            summary = click.style("no significant change", dim=True)
-
-        click.echo(f"{icon} {tc_id} — {summary}")
-
-        for cr in criteria_results:
-            delta = cr["delta"]
-            crit_name = cr["criterion"]
-            if cr["verdict"] == "improved":
-                mark = click.style("  ✓", fg="green")
-                detail = click.style(f"{crit_name} ({delta:+.1f})", fg="green")
-            elif cr["verdict"] == "regressed":
-                mark = click.style("  ✗", fg="red")
-                detail = click.style(f"{crit_name} ({delta:+.1f})", fg="red")
-            else:
-                mark = click.style("  →", dim=True)
-                detail = click.style(f"{crit_name} ({delta:+.1f})", dim=True)
-            click.echo(f"{mark} {detail}")
-
-        click.echo()
+        _render_test_case(tc)
 
     s = run_result["summary"]
     click.echo(click.style("─" * 37, dim=True))
@@ -135,6 +144,15 @@ def _render_diff(run_result: dict) -> None:
     click.echo(f"{improved_txt}  ·  {regressed_txt}  ·  {neutral_txt}")
     click.echo()
     click.echo("Run `llmdiff serve` to explore results in the dashboard")
+
+
+def _status(msg: str, *, erase: bool = False) -> None:
+    """Print a status line. If erase=True, overwrite it on the next call."""
+    if erase:
+        # Pad to 80 chars so previous longer line is fully overwritten
+        click.echo(f"\r{msg:<80}", nl=False)
+    else:
+        click.echo(msg)
 
 
 @main.command()
@@ -148,17 +166,49 @@ def compare(yaml_file, ci):
     config["yaml_file"] = yaml_file
     storage.init_db(DB_PATH)
 
+    total = len(config["test_cases"])
+    judge_model_name = config.get("judge_model", config["model"])
+
+    # ── Run phase: one test case at a time ───────────────────────────────────
     if not ci:
-        click.echo(f"Running {len(config['test_cases'])} test cases with {config['model']}...")
-    with click.progressbar(config["test_cases"], label="Running", file=None if not ci else open(os.devnull, "w")) as bar:
-        results = []
-        for tc in bar:
-            result = run_test_cases({"model": config["model"], "test_cases": [tc]})
-            results.extend(result)
+        click.echo(f"Model: {config['model']}  |  Judge: {judge_model_name}  |  {total} test cases\n")
+
+    results = []
+    for idx, tc in enumerate(config["test_cases"], 1):
+        if not ci:
+            _status(f"[{idx}/{total}] {tc['id']}  running...", erase=True)
+        result = run_test_cases({"model": config["model"], "test_cases": [tc]})
+        results.extend(result)
 
     if not ci:
-        click.echo(f"Judging with {config.get('judge_model', config['model'])}...")
-    run_result = judge_run(results, config)
+        # Clear the last status line before judging output
+        click.echo(f"\r{' ' * 80}\r", nl=False)
+
+    # ── Judge phase: stream results as each test case finishes ────────────────
+    judged_cases: list[dict] = []
+    n_judged = 0
+
+    def _on_criterion(i: int, total_crit: int, text: str) -> None:
+        if not ci:
+            tc_id = results[n_judged]["id"] if n_judged < len(results) else "…"
+            short = text[:40] + "…" if len(text) > 40 else text
+            _status(f"[{n_judged + 1}/{total}] {tc_id}  judging {i + 1}/{total_crit}: {short}", erase=True)
+
+    def _on_test_case(judged: dict) -> None:
+        nonlocal n_judged
+        if not ci:
+            # Clear the status line, then print the final verdict for this case
+            click.echo(f"\r{' ' * 80}\r", nl=False)
+            _render_test_case(judged)
+        judged_cases.append(judged)
+        n_judged += 1
+
+    run_result = judge_run(
+        results,
+        config,
+        test_case_callback=_on_test_case,
+        criterion_callback=_on_criterion,
+    )
     storage.save_run(run_result, DB_PATH)
 
     if ci:
@@ -173,10 +223,18 @@ def compare(yaml_file, ci):
         if not passed:
             sys.exit(1)
     else:
+        # Summary footer
+        s = run_result["summary"]
+        click.echo(click.style("─" * 37, dim=True))
+        improved_txt = click.style(f"{s['improved']} improved", fg="green")
+        regressed_txt = click.style(f"{s['regressed']} regressed", fg="red")
+        neutral_txt = click.style(f"{s['neutral']} neutral", dim=True)
+        click.echo(f"{improved_txt}  ·  {regressed_txt}  ·  {neutral_txt}")
         click.echo()
-        _render_diff(run_result)
+        click.echo("Run `llmdiff serve` to explore results in the dashboard")
+
         if "threshold" in config:
-            passed, msg = _check_thresholds(run_result["summary"], config["threshold"])
+            passed, msg = _check_thresholds(s, config["threshold"])
             click.echo(msg)
             if not passed:
                 sys.exit(1)
@@ -213,9 +271,8 @@ def history():
 @main.command()
 def serve():
     """Start the web UI at localhost:7331."""
-    port = int(os.environ.get("LLMDIFF_PORT", "7331"))
-    click.echo(f"Starting LLM Diff dashboard at http://localhost:{port}")
-    from llmdiff.server import start
+    click.echo(f"Starting LLM Diff dashboard at http://localhost:{_cfg.PORT}")
+    from backend.server import start
     start()
 
 
