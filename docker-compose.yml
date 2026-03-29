@@ -2,10 +2,15 @@ services:
   llmdiff:
     build: .
     ports:
-      - "7331:7331"
+      # Bind to 127.0.0.1 so the dashboard is not reachable from outside the host.
+      # Change to "0.0.0.0:7331:7331" only when running in an isolated network.
+      - "127.0.0.1:7331:7331"
     volumes:
       - ./tests:/workspace/tests
     environment:
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Bind the server inside the container to all interfaces so Docker port
+      # forwarding works (the host-side binding above limits external exposure).
+      - LLMDIFF_HOST=0.0.0.0
