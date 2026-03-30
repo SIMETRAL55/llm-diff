@@ -2,7 +2,7 @@
 
 > Prompt regression testing for RAG pipelines. Like git diff, but for AI.
 
-[![PyPI version](https://img.shields.io/pypi/v/llmdiff)](https://pypi.org/project/llmregress)
+[![PyPI version](https://img.shields.io/pypi/v/llmregress)](https://pypi.org/project/llmregress)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Provider Agnostic](https://img.shields.io/badge/Provider-Agnostic%20via%20LiteLLM-6C63FF)](https://docs.litellm.ai)
 
@@ -23,7 +23,7 @@
 
 ```bash
 # 1. Install
-pip install llmdiff
+pip install llmregress
 
 # 2. Get a free Groq API key at console.groq.com (takes 90 seconds)
 
@@ -34,10 +34,10 @@ export GROQ_API_KEY=your_key_here
 cp examples/rag_pipeline.yaml my_tests.yaml
 
 # 5. Compare your prompts
-llmdiff compare my_tests.yaml
+llmregress compare my_tests.yaml
 
 # 6. Open the web dashboard
-llmdiff serve
+llmregress serve
 # → http://localhost:7331
 ```
 
@@ -73,7 +73,7 @@ test_cases:
       Question: {input}
 ```
 
-Then run: `llmdiff compare my_tests.yaml`
+Then run: `llmregress compare my_tests.yaml`
 
 ## Switching providers
 
@@ -95,16 +95,16 @@ Change 1–2 lines in your YAML — no code changes:
 
 | Command | Description |
 |---------|-------------|
-| `llmdiff compare <yaml>` | Run + print colored diff to terminal |
-| `llmdiff run <yaml>` | Run + store results (no terminal output) |
-| `llmdiff history` | List past runs |
-| `llmdiff serve` | Start web dashboard at localhost:7331 |
-| `llmdiff demo` | Try it without an API key |
+| `llmregress compare <yaml>` | Run + print colored diff to terminal |
+| `llmregress run <yaml>` | Run + store results (no terminal output) |
+| `llmregress history` | List past runs |
+| `llmregress serve` | Start web dashboard at localhost:7331 |
+| `llmregress demo` | Try it without an API key |
 
 ## Web dashboard
 
 ```bash
-llmdiff serve
+llmregress serve
 ```
 
 Opens at `http://localhost:7331`. Features:
@@ -122,11 +122,11 @@ Opens at `http://localhost:7331`. Features:
 | `OPENAI_API_KEY` | — | OpenAI API key |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key |
 | `GOOGLE_API_KEY` | — | Google Gemini API key |
-| `LLMDIFF_DB_PATH` | `~/.llmdiff/history.db` | SQLite database path |
-| `LLMDIFF_PORT` | `7331` | Web server port |
-| `LLMDIFF_HOST` | `127.0.0.1` | Web server bind address |
-| `LLMDIFF_YAML_DIR` | `~/.llmdiff/tests` | Allowed directory for YAML test files |
-| `LLMDIFF_JUDGE_VOTES` | `3` | calls per criterion: 1=fast, 3=reliable majority vote | 
+| `llmregress_DB_PATH` | `~/.llmregress/history.db` | SQLite database path |
+| `llmregress_PORT` | `7331` | Web server port |
+| `llmregress_HOST` | `127.0.0.1` | Web server bind address |
+| `llmregress_YAML_DIR` | `~/.llmregress/tests` | Allowed directory for YAML test files |
+| `llmregress_JUDGE_VOTES` | `3` | calls per criterion: 1=fast, 3=reliable majority vote | 
 
 ## Docker
 
