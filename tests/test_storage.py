@@ -1,9 +1,9 @@
-"""Tests for llmdiff.storage — uses in-memory SQLite."""
+"""Tests for llmregress.storage — uses in-memory SQLite."""
 import json
 
 import pytest
 
-from backend.storage import get_run, init_db, list_runs, save_run
+from llmregress.storage import get_run, init_db, list_runs, save_run
 
 DB = ":memory:"
 

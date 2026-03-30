@@ -1,9 +1,9 @@
-"""Tests for llmdiff.runner — no real API calls."""
+"""Tests for llmregress.runner — no real API calls."""
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.runner import run_test_cases
+from llmregress.runner import run_test_cases
 
 BASIC_CONFIG = {
     "model": "groq/llama3-70b-8192",
@@ -25,7 +25,7 @@ def _mock_completion(content="Mock answer"):
     return mock
 
 
-@patch("backend.runner.litellm.completion")
+@patch("llmregress.runner.litellm.completion")
 def test_calls_litellm_with_correct_model(mock_completion):
     mock_completion.return_value = _mock_completion()
     run_test_cases(BASIC_CONFIG)
@@ -33,7 +33,7 @@ def test_calls_litellm_with_correct_model(mock_completion):
     assert all(c.kwargs["model"] == "groq/llama3-70b-8192" for c in calls)
 
 
-@patch("backend.runner.litellm.completion")
+@patch("llmregress.runner.litellm.completion")
 def test_substitutes_input_and_context(mock_completion):
     mock_completion.return_value = _mock_completion()
     run_test_cases(BASIC_CONFIG)
@@ -46,7 +46,7 @@ def test_substitutes_input_and_context(mock_completion):
         assert "The default chunk size is 1000 characters." in content
 
 
-@patch("backend.runner.litellm.completion")
+@patch("llmregress.runner.litellm.completion")
 def test_failed_test_case_does_not_crash(mock_completion):
     mock_completion.side_effect = Exception("API error")
     config = {
@@ -67,7 +67,7 @@ def test_failed_test_case_does_not_crash(mock_completion):
     assert "ERROR" in results[0]["output_v1"]
 
 
-@patch("backend.runner.litellm.completion")
+@patch("llmregress.runner.litellm.completion")
 def test_output_shape_matches_schema(mock_completion):
     mock_completion.return_value = _mock_completion("answer text")
     results = run_test_cases(BASIC_CONFIG)
@@ -84,7 +84,7 @@ def test_output_shape_matches_schema(mock_completion):
     "openai/gpt-4o-mini",
     "anthropic/claude-3-haiku-20240307",
 ])
-@patch("backend.runner.litellm.completion")
+@patch("llmregress.runner.litellm.completion")
 def test_model_string_passed_through_unchanged(mock_completion, model):
     mock_completion.return_value = _mock_completion()
     config = {
