@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "llmdiff"
+name = "llmregress"
 version = "0.1.0"
 description = "Prompt regression testing for RAG pipelines. Like git diff, but for AI."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-authors = [{ name = "LLM Diff Contributors" }]
+authors = [{ name = "Wasim Shaikh" }]
 keywords = ["llm", "prompt", "testing", "regression", "rag"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -35,11 +35,11 @@ dependencies = [
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-llmdiff = "backend.cli:main"
+llmregress = "backend.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/llm-diff"
-Repository = "https://github.com/your-org/llm-diff"
+Homepage = "https://github.com/SIMETRAL55/llm-diff"
+Repository = "https://github.com/SIMETRAL55/llm-diff"
 
 [tool.setuptools.packages.find]
 where = ["."]
