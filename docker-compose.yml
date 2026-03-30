@@ -1,5 +1,5 @@
 services:
-  llmdiff:
+  llmregress:
     build: .
     ports:
       # Bind to 127.0.0.1 so the dashboard is not reachable from outside the host.
@@ -13,4 +13,4 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       # Bind the server inside the container to all interfaces so Docker port
       # forwarding works (the host-side binding above limits external exposure).
-      - LLMDIFF_HOST=0.0.0.0
+      - LLMREGRESS_HOST=0.0.0.0
