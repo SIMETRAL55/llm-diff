@@ -2,7 +2,7 @@
 
 > Prompt regression testing for RAG pipelines. Like git diff, but for AI.
 
-[![PyPI version](https://img.shields.io/pypi/v/llmdiff)](https://pypi.org/project/llmdiff)
+[![PyPI version](https://img.shields.io/pypi/v/llmdiff)](https://pypi.org/project/llmregress)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Provider Agnostic](https://img.shields.io/badge/Provider-Agnostic%20via%20LiteLLM-6C63FF)](https://docs.litellm.ai)
 
