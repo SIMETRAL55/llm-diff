@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llmregress"
-version = "0.1.4"
+version = "0.1.6"
 description = "Prompt regression testing for RAG pipelines. Like git diff, but for AI."
 readme = "README.md"
 license = { text = "MIT" }
