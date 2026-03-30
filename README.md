@@ -15,9 +15,9 @@
 ## Why LLM Diff
 
 - **You changed a prompt. Did it get better?** Find out in 2 minutes.
-- **Works with any LLM** — OpenAI, Anthropic, Ollama, Google Gemini.
+- **Works with any LLM** — OpenAI, Anthropic, Google Gemini, and more.
 - **Local-first.** No accounts, no cloud, no data leaves your machine.
-- **One env var.** Set api key and you're done.
+- **One env var.** Set your API key and you're done.
 
 ## Quickstart
 
@@ -25,18 +25,18 @@
 # 1. Install
 pip install llmregress
 
-# 2. Get a free Groq API key at console.groq.com (takes 90 seconds)
+# 2. Set your API key (pick any provider you already have)
+export ANTHROPIC_API_KEY=your_key_here
+# or: export OPENAI_API_KEY=your_key_here
+# or: export GOOGLE_API_KEY=your_key_here
 
-# 3. Set the key
-export GROQ_API_KEY=your_key_here
-
-# 4. Copy an example test file
+# 3. Copy an example test file
 cp examples/rag_pipeline.yaml my_tests.yaml
 
-# 5. Compare your prompts
+# 4. Compare your prompts
 llmregress compare my_tests.yaml
 
-# 6. Open the web dashboard
+# 5. Open the web dashboard
 llmregress serve
 # → http://localhost:7331
 ```
@@ -52,8 +52,8 @@ result = chain.invoke({"question": q, "context": c})
 Translate it into a YAML test case:
 
 ```yaml
-model: groq/llama3-70b-8192
-judge_model: groq/llama3-70b-8192
+model: anthropic/claude-3-5-haiku-20241022
+judge_model: openai/gpt-4o-mini
 test_cases:
   - id: my_test
     input: "What is the default chunk size?"
@@ -75,21 +75,24 @@ test_cases:
 
 Then run: `llmregress compare my_tests.yaml`
 
-## Switching providers
+## Providers & model strings
 
-Change 1–2 lines in your YAML — no code changes:
+Change 1–2 lines in your YAML — no code changes. You can use **any model** from each provider family:
 
-| Provider       | Model string                          | Env var             |
-|----------------|---------------------------------------|---------------------|
-| Groq (default) | `groq/llama3-70b-8192`                | `GROQ_API_KEY`      |
-| Groq fast      | `groq/llama-3.1-8b-instant`           | `GROQ_API_KEY`      |
-| OpenAI         | `openai/gpt-4o-mini`                  | `OPENAI_API_KEY`    |
-| Anthropic      | `anthropic/claude-3-haiku-20240307`   | `ANTHROPIC_API_KEY` |
-| Google Gemini  | `gemini/gemini-2.0-flash`             | `GOOGLE_API_KEY`    |
+| Provider      | Example model string                        | Env var             |
+|---------------|---------------------------------------------|---------------------|
+| Anthropic      | `anthropic/claude-3-5-haiku-20241022`      | `ANTHROPIC_API_KEY` |
+| Anthropic      | `anthropic/claude-opus-4`                  | `ANTHROPIC_API_KEY` |
+| OpenAI         | `openai/gpt-4o-mini`                       | `OPENAI_API_KEY`    |
+| OpenAI         | `openai/gpt-4o`                            | `OPENAI_API_KEY`    |
+| Google Gemini  | `gemini/gemini-2.0-flash`                  | `GOOGLE_API_KEY`    |
+| Google Gemini  | `gemini/gemini-1.5-pro`                    | `GOOGLE_API_KEY`    |
+| Ollama (local) | `ollama/llama3`                            | *(none)*            |
+
+> The model string format is always `provider/model-name`. Any model supported by [LiteLLM](https://docs.litellm.ai/docs/providers) works — just set the matching API key.
 
 > **Reduce judge bias:** use a different model family for `judge_model` than `model`.
-> Example: Gemini runner + Groq/Llama judge = cross-family, lowest self-preference bias.
-> See `examples/rag_pipeline_groq_judge.yaml` for a ready-made cross-family config.
+> Example: Anthropic runner + OpenAI judge = cross-family, lowest self-preference bias.
 
 ## CLI reference
 
@@ -118,15 +121,14 @@ Opens at `http://localhost:7331`. Features:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GROQ_API_KEY` | — | Groq API key (default provider) |
-| `OPENAI_API_KEY` | — | OpenAI API key |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key |
+| `OPENAI_API_KEY` | — | OpenAI API key |
 | `GOOGLE_API_KEY` | — | Google Gemini API key |
-| `llmregress_DB_PATH` | `~/.llmregress/history.db` | SQLite database path |
-| `llmregress_PORT` | `7331` | Web server port |
-| `llmregress_HOST` | `127.0.0.1` | Web server bind address |
-| `llmregress_YAML_DIR` | `~/.llmregress/tests` | Allowed directory for YAML test files |
-| `llmregress_JUDGE_VOTES` | `3` | calls per criterion: 1=fast, 3=reliable majority vote | 
+| `LLMREGRESS_DB_PATH` | `~/.llmregress/history.db` | SQLite database path |
+| `LLMREGRESS_PORT` | `7331` | Web server port |
+| `LLMREGRESS_HOST` | `127.0.0.1` | Web server bind address |
+| `LLMREGRESS_YAML_DIR` | `~/.llmregress/tests` | Allowed directory for YAML test files |
+| `LLMREGRESS_JUDGE_VOTES` | `3` | Calls per criterion: 1=fast, 3=reliable majority vote |
 
 ## Docker
 
